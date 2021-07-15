@@ -18,7 +18,7 @@ Next, load `table-to-java.lisp` and run `(generate-class-from-database-table "my
 Example output:
 
 ```
-"public class Role {
+public class Role {
 
     private int roleId;
     private String roleName;
