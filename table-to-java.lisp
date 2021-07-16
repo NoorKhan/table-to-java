@@ -2,7 +2,7 @@
 (ql:quickload :modest-config)
 
 (defparameter *connection*
-  (modest-config:with-config "table-to-java/connection.config" (hostname username password database)
+  (modest-config:with-config "connection.config" (hostname username password database)
     (qmynd:mysql-connect :host hostname :username username :password password :database database)))
 
 (defun execute-query (query)
@@ -38,20 +38,35 @@
       ((search "bigint" database-type) (if nullable? "Long" (gethash "bigint" *sql-to-java-types-map*)))
       ((search "float" database-type) (if nullable? "Float" (gethash "float" *sql-to-java-types-map*)))
       ((string-equal database-type "bit(1)") (if nullable? "Boolean" (gethash "bit(1)" *sql-to-java-types-map*)))
-      ((string-equal database-type "datetime") (gethash "bit(1)" *sql-to-java-types-map*))
+      ((string-equal database-type "datetime") (gethash "datetime" *sql-to-java-types-map*))
       (t "String"))))
 
 (defun generate-class (class-name fields)
-  (concatenate 'string
-	       (format nil "public class ~a {~2%" class-name)
-	       (format nil "~{~a~}~%" (mapcar #'(lambda (field) (get-field field)) fields))
-	       (format nil "~{~a~^~%~}" (mapcar #'(lambda (field) (get-getter field)) fields))
-	       (format nil "}~2%")))
+  (let ((class (concatenate 'string
+			    (format nil "public class ~a {~2%" class-name)
+			    (format nil "~{~a~}~%" (mapcar #'(lambda (field) (get-field field)) fields))
+			    (get-constructor class-name fields)
+			    (format nil "~{~a~^~%~}" (mapcar #'(lambda (field) (get-getter field)) fields))
+			    (format nil "}~2%"))))
+    (if (search "ZonedDateTime" class)
+	(concatenate 'string (format nil "import java.time.ZonedDateTime;~2%") class)
+	class)))
 
 (defun get-field (field)
   (let ((field-name (underscore-to-snake-case (car field)))
 	(field-type (cdr field)))
     (format nil "    private ~a ~a;~%" field-type field-name )))
+
+(defun get-constructor (class-name fields)
+  (let ((field-names-with-types (mapcar
+				 #'(lambda (field) (concatenate 'string (cdr field) " " (underscore-to-snake-case (car field))))
+				 fields))
+	(field-setters (mapcar #'(lambda (field) (let ((field-name (underscore-to-snake-case (car field))))
+						   (format nil "this.~a = ~a;" field-name field-name)))
+			       fields)))
+    (concatenate 'string
+		 (format nil "    public ~a(~{~a~^,~^ ~}) {~%" class-name field-names-with-types)
+		 (format nil "~{        ~a~%~}    }~2%" field-setters))))
 
 (defun get-getter (field)
   (let ((snake-case-field-name (underscore-to-snake-case (car field)))
@@ -66,4 +81,3 @@
       (let ((split (split-sequence:split-sequence #\_ s)))
 	(concatenate 'string (car split) (apply #'concatenate 'string (mapcar #'string-capitalize (cdr split)))))
       s))
-
