@@ -26,6 +26,14 @@ public class Role {
     private String description;
     private boolean editable;
 
+    public Role(int roleId, String roleName, Boolean isActive, String description, boolean editable) {
+        this.roleId = roleId;
+        this.roleName = roleName;
+        this.isActive = isActive;
+        this.description = description;
+        this.editable = editable;
+    }
+
     public int getRoleId() {
         return this.roleId;
     }
